@@ -1,50 +1,41 @@
 import re
 
-# Read the file content
-with open('ShortStory.txt', 'r') as file:
-    content = file.read()
+# Read file
+with open('ShortStory.txt', 'r') as f:
+    content = f.read()
 
-# Step 1: Remove any newlines and unnecessary spaces that may cause incorrect splits
-content = content.replace('\n', ' ').strip()
+# collapse all whitespace (including newlines) into single spaces
+content = re.sub(r'\s+', ' ', content).strip()
 
-# Step 2: Split the content into sentences carefully, but without splitting attributed parts like asked Jerrodd
-# This will ensure we keep quoted text with the attribution part
-sentences = re.split(r'(?<!["\'])\s*(?=[.!?])', content)
+# remove any divider lines of hyphens
+content = re.sub(r'-{2,}', ' ', content)
 
-# Step 3: Remove hyphen separators (------------------------------------------------) from the sentences list
-sentences = [sentence for sentence in sentences if sentence != '------------------------------------------------']
+# Use findall to grab each sentence up to an end-of-sentence boundary,
+# including any trailing quotes, but only if the next chunk really is
+# a new sentence (whitespace + optional quote + uppercase) or end of text.
+pattern = r'''
+    .*?                  # minimally match up to…
+    [\.!?]               # a sentence-ending ., ! or ?
+    (?:["'])*            # —plus any trailing quotes—
+    (?=                  # but only if what follows is…
+       \s+["']?[A-Z]     #   whitespace + optional opening quote + uppercase
+     | $                 # or end of text
+    )
+'''
+sentences = re.findall(pattern, content, flags=re.X)
 
-# Function to clean sentences by removing leading/trailing punctuation and spaces
-def clean_sentence(sentence):
-    # Remove punctuation marks at the start and end of the sentence
-    return re.sub(r'^[^\w]+|[^\w]+$', '', sentence).strip()
+# Clean each sentence (trim stray punctuation/spaces but preserve quotes)
+def clean_sentence(s):
+    return re.sub(r'^[^\w"’‘]+|[^\w"’‘]+$', '', s).strip()
 
-# Clean all sentences by removing punctuation and spaces at the beginning and end
-sentences = [clean_sentence(sentence) for sentence in sentences]
+sentences = [clean_sentence(s) for s in sentences if s.strip()]
 
-# Function to handle sentences with quotation marks and continuation after quotes
-def handle_quoted_sentences(sentences):
-    quoted_sentences = []
-    for i, sentence in enumerate(sentences):
-        # Check if current sentence starts with lowercase and is a continuation of the previous sentence
-        if i > 0:
-            # Check if the current sentence starts with a lowercase letter and if the previous sentence ends with a quote
-            if sentence[0].islower() and sentences[i-1].endswith('"'):
-                # Combine the current sentence with the previous one
-                sentences[i-1] = sentences[i-1][:-1] + ' ' + sentence.strip()  # Remove the ending quote from the previous sentence and merge
-                continue
-        # Otherwise, add the sentence as it is
-        quoted_sentences.append(sentences[i])
-    return quoted_sentences
+# Sort alphabetically (ignoring any leading non-alphanumerics for ordering)
+sorted_sents = sorted(
+    sentences,
+    key=lambda s: re.sub(r'^[^A-Za-z0-9]+', '', s).lower()
+)
 
-# Handle sentences inside quotation marks and continuations after a quote
-sentences = handle_quoted_sentences(sentences)
-
-# Step 4: Sort the sentences alphabetically
-sorted_sentences = sorted(sentences, key=lambda s: re.sub(r"^[^a-zA-Z0-9]+", "", s).lower())
-
-# Step 5: Write the sorted sentences to a new file
-with open('Sorted_Story.txt', 'w') as file:
-    file.write('\n'.join(sorted_sentences))
-
-print("The sentences have been sorted and written to 'Sorted_Story.txt'.")
+# 5) Get sorted file with a sentence on each line
+with open('SortedStory.txt', 'w') as f:
+    f.write('\n'.join(sorted_sents))
